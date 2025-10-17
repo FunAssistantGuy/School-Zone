@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>School Zone</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: sans-serif;
+      background: #1e1e2f;
+      color: white;
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    .container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+    }
+    
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+      font-size: 28px;
+      font-weight: bold;
+    }
+    
+    .close-btn {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 32px;
+      cursor: pointer;
+    }
+    
+    .content {
+      flex: 1;
+      overflow-y: auto;
+    }
+    
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    
+    button {
+      background: #2a2a40;
+      border: none;
+      border-radius: 8px;
+      padding: 15px;
+      color: white;
+      cursor: pointer;
+      font-size: 16px;
+      transition: filter 0.2s;
+    }
+    
+    button:hover {
+      filter: brightness(1.08);
+    }
+    
+    button.wide {
+      width: 100%;
+    }
+    
+    .tab-container {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 15px;
+    }
+    
+    .tab-container button {
+      flex: 1;
+      margin: 0;
+    }
+    
+    .schedule-div, .calendar-div, .events-list {
+      background: #14141f;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    .schedule-item, .event-item {
+      padding: 12px;
+      margin-bottom: 8px;
+      background: #2a2a40;
+      border-radius: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .time-text {
+      color: #b0b0b0;
+      font-size: 13px;
+    }
+    
+    textarea {
+      width: 100%;
+      padding: 10px;
+      border-radius: 6px;
+      border: 1px solid #3a3a3c;
+      background: #14141f;
+      color: white;
+      font-family: sans-serif;
+      font-size: 14px;
+      margin-bottom: 10px;
+      resize: vertical;
+    }
+    
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 6px;
+      margin-bottom: 15px;
+    }
+    
+    .calendar-cell {
+      aspect-ratio: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #2a2a40;
+      border-radius: 6px;
+      cursor: pointer;
+      position: relative;
+      font-weight: bold;
+    }
+    
+    .calendar-cell:hover {
+      background: #3a3a50;
+    }
+    
+    .calendar-cell.today {
+      background: #2a2a40;
+      font-weight: bold;
+    }
+    
+    .event-dot {
+      position: absolute;
+      top: 2px;
+      right: 2px;
+      width: 8px;
+      height: 8px;
+      background: #ff6b6b;
+      border-radius: 50%;
+    }
+    
+    .success-msg {
+      text-align: center;
+      margin-top: 10px;
+      color: #4CAF50;
+      font-size: 13px;
+    }
+    
+    .display-large {
+      text-align: center;
+      font-size: 72px;
+      font-weight: bold;
+      padding: 40px;
+      background: #14141f;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    
+    .period-display {
+      text-align: center;
+      font-size: 24px;
+      font-weight: bold;
+      padding: 15px;
+      background: #2a2a40;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      color: #4CAF50;
+    }
+    
+    iframe {
+      width: 100%;
+      height: 400px;
+      border-radius: 8px;
+      border: none;
+      margin-bottom: 15px;
+    }
+    
+    .resource-links {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+    }
+    
+    .no-events {
+      color: #b0b0b0;
+      text-align: center;
+      padding: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <span id="title">🎓 School Zone</span>
+      <button class="close-btn" id="backBtn" style="display:none;" onclick="goToMain()">←</button>
+    </div>
+    <div class="content" id="mainContent"></div>
+  </div>
+
+  <script>
+    let calendarEvents = {};
+    try {
+      let saved = localStorage.getItem("calendarEvents");
+      if (saved) calendarEvents = JSON.parse(saved);
+    } catch (e) {}
+
+    function createButton(text, callback, options = {}) {
+      const btn = document.createElement("button");
+      btn.innerText = text;
+      if (options.wide) btn.classList.add("wide");
+      if (options.bg) btn.style.background = options.bg;
+      btn.onclick = callback;
+      return btn;
+    }
+
+    function goToMain() {
+      document.getElementById("backBtn").style.display = "none";
+      buildMainPanel();
+    }
+
+    function showBackButton() {
+      document.getElementById("backBtn").style.display = "block";
+    }
+
+    function buildMainPanel() {
+      document.getElementById("title").innerText = "🎓 School Zone";
+      const content = document.getElementById("mainContent");
+      content.innerHTML = "";
+      
+      const grid = document.createElement("div");
+      grid.className = "grid";
+      
+      grid.appendChild(createButton("📅 Calendar", showCalendarPanel));
+      grid.appendChild(createButton("🔔 Bell Schedule", showBellSchedule));
+      grid.appendChild(createButton("🎵 Focus Music", showFocusMusic));
+      grid.appendChild(createButton("📝 Study Notes", showStudyNotes));
+      grid.appendChild(createButton("⏰ Class Timer", showClassTimer));
+      grid.appendChild(createButton("🔗 Quick Links", showResources));
+      grid.appendChild(createButton("📚 Notes Organizer", showNotesOrganizer));
+      grid.appendChild(createButton("⏱️ Timer", showTimer));
+      
+      content.appendChild(grid);
+    }
+
+    function showHomeworkTracker() {
+      document.getElementById("title").innerText = "🔬 Homework Tracker";
+      const content = document.getElementById("mainContent");
+      content.innerHTML = "";
+
+      let homeworkData = {};
+      try {
+        let saved = localStorage.getItem("homeworkTracker");
+        if (saved) homeworkData = JSON.parse(saved);
+      } catch (e) {}
+
+      const textarea = document.createElement("textarea");
+      textarea.placeholder = "Add homework (Subject: Task | Due Date)...";
+      textarea.style.height = "150px";
+      content.appendChild(textarea);
+
+      const addBtn = createButton("Add Homework", () => {
+        if (textarea.value.trim()) {
+          const id = Date.now();
+          homeworkData[id] = { task: textarea.value.trim(), completed: false };
+          saveHomework();
+          textarea.value = "";
+          showHomeworkTracker();
+        }
+      }, { wide: true, bg: "#4CAF50" });
+      content.appendChild(addBtn);
+
+      const hwList = document.createElement("div");
+      hwList.style.marginTop = "20px";
+
+      Object.keys(homeworkData).forEach(id => {
+        const hw = homeworkData[id];
+        const hwItem = document.createElement("div");
+        hwItem.className = "event-item";
+        hwItem.style.opacity = hw.completed ? "0.5" : "1";
+        hwItem.innerHTML = `<span>${hw.task}</span>`;
+
+        const completeBtn = createButton(hw.completed ? "✓" : "•", () => {
+          hw.completed = !hw.completed;
+          saveHomework();
+          showHomeworkTracker();
+        });
+        completeBtn.style.margin = "0";
+        completeBtn.style.padding = "4px 12px";
+        completeBtn.style.background = hw.completed ? "#4CAF50" : "#FFD700";
+
+        const deleteBtn = createButton("✕", () => {
+          delete homeworkData[id];
+          saveHomework();
+          showHomeworkTracker();
+        });
+        deleteBtn.style.margin = "0";
+        deleteBtn.style.padding = "4px 12px";
+        deleteBtn.style.background = "#ff6b6b";
+
+        hwItem.appendChild(completeBtn);
+        hwItem.appendChild(deleteBtn);
+        hwList.appendChild(hwItem);
+      });
+
+      content.appendChild(hwList);
+
+      function saveHomework() {
+        try {
+          localStorage.setItem("homeworkTracker", JSON.stringify(homeworkData));
+        } catch (e) {
+          alert("Error saving homework");
+        }
+      }
+    }
+
+    function showGoals() {
+      document.getElementById("title").innerText = "🎯 Goals";
+      const content = document.getElementById("mainContent");
+      content.innerHTML = "";
+
+      let goalsData = {};
+      try {
+        let saved = localStorage.getItem("goalsData");
+        if (saved) goalsData = JSON.parse(saved);
+      } catch (e) {}
+
+      const textarea = document.createElement("textarea");
+      textarea.placeholder = "Add your goal...";
+      textarea.style.height = "120px";
+      content.appendChild(textarea);
+
+      const addBtn = createButton("Add Goal", () => {
+        if (textarea.value.trim()) {
+          const id = Date.now();
+          goalsData[id] = { goal: textarea.value.trim(), date: new Date().toLocaleDateString() };
+          saveGoals();
+          textarea.value = "";
+          showGoals();
+        }
+      }, { wide: true, bg: "#4CAF50" });
+      content.appendChild(addBtn);
+
+      const goalsList = document.createElement("div");
+      goalsList.style.marginTop = "20px";
+
+      Object.keys(goalsData).forEach(id => {
+        const goal = goalsData[id];
+        const goalItem = document.createElement("div");
+        goalItem.className = "event-item";
+        goalItem.innerHTML = `<div><span style="font-weight:bold;">${goal.goal}</span><br><span class="time-text">${goal.date}</span></div>`;
+
+        const deleteBtn = createButton("✕", () => {
+          delete goalsData[id];
+          saveGoals();
+          showGoals();
+        });
+        deleteBtn.style.margin = "0";
+        deleteBtn.style.padding = "4px 12px";
+        deleteBtn.style.background = "#ff6b6b";
+
+        goalItem.appendChild(deleteBtn);
+        goalsList.appendChild(goalItem);
+      });
+
+      content.appendChild(goalsList);
+
+      function saveGoals() {
+        try {
+          localStorage.setItem("goalsData", JSON.stringify(goalsData));
+        } catch (e) {
+          alert("Error saving goals");
+        }
+      }
+    }
+
+    function showNotesOrganizer() {
+      showBackButton();
+      document.getElementById("title").innerText = "📚 Notes Organizer";
+      const content = document.getElementById("mainContent");
+      content.innerHTML = "";
+
+      let notesOrgData = {};
+      try {
+        let saved = localStorage.getItem("notesOrganizer");
+        if (saved) notesOrgData = JSON.parse(saved);
+      } catch (e) {}
+
+      const subjectInput = document.createElement("input");
+      subjectInput.type = "text";
+      subjectInput.placeholder = "Subject (e.g., Biology)";
+      subjectInput.style.cssText = "width:100%;padding:10px;border-radius:6px;border:1px solid #3a3a3c;background:#14141f;color:white;font-size:14px;margin-bottom:10px;";
+      content.appendChild(subjectInput);
+
+      const textarea = document.createElement("textarea");
+      textarea.placeholder = "Write notes...";
+      textarea.style.height = "200px";
+      content.appendChild(textarea);
+
+      const addBtn = createButton("Save Notes", () => {
+        if (subjectInput.value.trim() && textarea.value.trim()) {
+          const id = Date.now();
+          notesOrgData[id] = { subject: subjectInput.value.trim(), notes: textarea.value.trim(), date: new Date().toLocaleDateString() };
+          saveNotes();
+          subjectInput.value = "";
+          textarea.value = "";
+          showNotesOrganizer();
+        }
+      }, { wide: true, bg: "#4CAF50" });
+      content.appendChild(addBtn);
+
+      const notesList = document.createElement("div");
+      notesList.style.marginTop = "20px";
+
+      Object.keys(notesOrgData).forEach(id => {
+        const note = notesOrgData[id];
+        const noteItem = document.createElement("div");
+        noteItem.className = "event-item";
+        noteItem.style.flexDirection = "column";
+        noteItem.style.alignItems = "flex-start";
+        noteItem.innerHTML = `<span style="font-weight:bold;margin-bottom:5px;">${note.subject}</span><span class="time-text">${note.notes.substring(0, 50)}...</span><span class="time-text">${note.date}</span>`;
+
+        const deleteBtn = createButton("✕", () => {
+          delete notesOrgData[id];
+          saveNotes();
+          showNotesOrganizer();
+        });
+        deleteBtn.style.margin = "0";
+        deleteBtn.style.padding = "4px 12px";
+        deleteBtn.style.background = "#ff6b6b";
+
+        noteItem.appendChild(deleteBtn);
+        notesList.appendChild(noteItem);
+      });
+
+      content.appendChild(notesList);
+
+      function saveNotes() {
+        try {
+          localStorage.setItem("notesOrganizer", JSON.stringify(notesOrgData));
+        } catch (e) {
+          alert("Error saving notes");
+        }
+      }
+    }
+
+    function showTimer() {
+      showBackButton();
+      document.getElementById("title").innerText = "⏱️ Timer";
+      const content = document.getElementById("mainContent");
+      content.innerHTML = "";
+
+      let timeLeft = 25 * 60;
+      let isRunning = false;
+      let timerInterval = null;
+
+      const inputContainer = document.createElement("div");
+      inputContainer.style.cssText = "display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;";
+
+      const hoursInput = document.createElement("input");
+      hoursInput.type = "number";
+      hoursInput.value = "0";
+      hoursInput.min = "0";
+      hoursInput.max = "23";
+      hoursInput.placeholder = "Hours";
+      hoursInput.style.cssText = "flex:1;min-width:80px;padding:10px;border-radius:6px;border:1px solid #3a3a3c;background:#14141f;color:white;font-size:14px;";
+
+      const minutesInput = document.createElement("input");
+      minutesInput.type = "number";
+      minutesInput.value = "25";
+      minutesInput.min = "0";
+      minutesInput.max = "59";
+      minutesInput.placeholder = "Minutes";
+      minutesInput.style.cssText = "flex:1;min-width:80px;padding:10px;border-radius:6px;border:1px solid #3a3a3c;background:#14141f;color:white;font-size:14px;";
+
+      const secondsInput = document.createElement("input");
+      secondsInput.type = "number";
+      secondsInput.value = "0";
+      secondsInput.min = "0";
+      secondsInput.max = "59";
+      secondsInput.placeholder = "Seconds";
+      secondsInput.style.cssText = "flex:1;min-width:80px;padding:10px;border-radius:6px;border:1px solid #3a3a3c;background:#14141f;color:white;font-size:14px;";
+
+      const setBtn = createButton("Set Time", () => {
+        if (!isRunning) {
+          const hours = parseInt(hoursInput.value) || 0;
+          const mins = parseInt(minutesInput.value) || 0;
+          const secs = parseInt(secondsInput.value) || 0;
+          timeLeft = hours * 3600 + mins * 60 + secs;
+          updateDisplay();
+        }
+      }, { bg: "#2196F3" });
+
+      inputContainer.appendChild(hoursInput);
+      inputContainer.appendChild(minutesInput);
+      inputContainer.appendChild(secondsInput);
+      inputContainer.appendChild(setBtn);
+      content.appendChild(inputContainer);
+
+      const timerDisplay = document.createElement("div");
+      timerDisplay.className = "display-large";
+      timerDisplay.innerText = "25:00";
+      content.appendChild(timerDisplay);
+
+      function updateDisplay() {
+        const mins = Math.floor(timeLeft / 60);
+        const secs = timeLeft % 60;
+        timerDisplay.innerText = mins + ":" + (secs < 10 ? "0" : "") + secs;
+      }
+
+      const btnContainer = document.createElement("div");
+      btnContainer.style.display = "flex";
+      btnContainer.style.gap = "12px";
+
+      const startBtn = createButton("Start", () => {
+        if (!isRunning && timeLeft > 0) {
+          isRunning = true;
+          timerInterval = setInterval(() => {
+            timeLeft--;
+            if (timeLeft <= 0) {
+              isRunning = false;
+              clearInterval(timerInterval);
+              alert("Time's up!");
+              timeLeft = 0;
+            }
+            updateDisplay();
+          }, 1000);
+        }
+      }, { wide: true, bg: "#4CAF50" });
+
+      const pauseBtn = createButton("Pause", () => {
+        isRunning = false;
+        if (timerInterval) clearInterval(timerInterval);
+      }, { wide: true, bg: "#FFD700" });
+
+      const resetBtn = createButton("Reset", () => {
+        isRunning = false;
+        if (timerInterval) clearInterval(timerInterval);
+        timeLeft = (parseInt(minutesInput.value) || 25) * 60 + (parseInt(secondsInput.value) || 0);
+        updateDisplay();
+      }, { wide: true, bg: "#ff6b6b" });
+
+      btnContainer.appendChild(startBtn);
+      btnContainer.appendChild(pauseBtn);
+      btnContainer.appendChild(resetBtn);
+      content.appendChild(btnContainer);
+
+      updateDisplay();
+    }
+
+    function showBellSchedule() {
+      showBackButton();
+      document.getElementById("title").innerText = "🔔 Bell Schedule";
+      const content = document.getElementById("mainContent");
+      content.innerHTML = "";
+
+      const schedules = {
+        regular: [
+          { period: "Zero Period", time: "7:15 AM - 8:00 AM" },
+          { period: "First Bell", time: "8:13 AM" },
+          { period: "Homeroom", time: "8:18 AM - 8:23 AM" },
+          { period: "Period 1", time: "8:23 AM - 9:12 AM" },
+          { period: "Period 2", time: "9:17 AM - 10:06 AM" },
+          { period: "Period 3", time: "10:11 AM - 11:00 AM" },
+          { period: "Period 4", time: "11:05 AM - 11:54 AM" },
+          { period: "Lunch", time: "11:54 AM - 12:32 PM" },
+          { period: "SSR", time: "12:37 PM - 12:52 PM" },
+          { period: "Period 5", time: "12:52 PM - 1:41 PM" },
+          { period: "Period 6", time: "1:46 PM - 2:35 PM" }
+        ],
+        staff: [
+          { period: "Zero Period", time: "7:15 AM - 8:00 AM" },
+          { period: "First Bell", time: "8:13 AM" },
+          { period: "Homeroom", time: "8:18 AM - 8:22 AM" },
+          { period: "Period 1", time: "8:22 AM - 8:56 AM" },
+          { period: "Period 2", time: "9:01 AM - 9:35 AM" },
+          { period: "Period 3", time: "9:40 AM - 10:14 AM" },
+          { period: "Period 4", time: "10:19 AM - 10:53 AM" },
+          { period: "Nutrition", time: "10:53 AM - 11:12 AM" },
+          { period: "Period 5", time: "11:17 AM - 11:51 AM" },
+          { period: "Period 6", time: "11:56 AM - 12:30 PM" }
+        ],
+        minimum: [
+          { period: "First Bell", time: "8:13 AM" },
+          { period: "Homeroom & Period 1", time: "8:18 AM - 8:49 AM" },
+          { period: "Period 2", time: "8:54 AM - 9:20 AM" },
+          { period: "Period 3", time: "9:25 AM - 9:51 AM" },
+          { period: "Period 4", time: "9:56 AM - 10:22 AM" },
+          { period: "Nutrition", time: "10:22 AM - 10:47 AM" },
+          { period: "Period 5", time: "10:53 AM - 11:19 AM" },
+          { period: "Period 6", time: "11:24 AM - 11:50 AM" }
+        ]
+      };
+
+      let currentSchedule = "regular";
+
+      const tabContainer = document.createElement("div");
+      tabContainer.className = "tab-container";
+
+      const regularTab = createButton("Regular", () => {
+        currentSchedule = "regular";
+        renderSchedule();
+        updateTabs();
+      });
+      regularTab.style.background = "#4CAF50";
+
+      const staffTab = createButton("Staff Day", () => {
+        currentSchedule = "staff";
+        renderSchedule();
+        updateTabs();
+      });
+
+      const minimumTab = createButton("Minimum", () => {
+        currentSchedule = "minimum";
+        renderSchedule();
+        updateTabs();
+      });
+
+      tabContainer.appendChild(regularTab);
+      tabContainer.appendChild(staffTab);
+      tabContainer.appendChild(minimumTab);
+      content.appendChild(tabContainer);
+
+      const scheduleDiv = document.createElement("div");
+      scheduleDiv.className = "schedule-div";
+      content.appendChild(scheduleDiv);
+
+      function updateTabs() {
+        regularTab.style.background = currentSchedule === "regular" ? "#4CAF50" : "#2a2a40";
+        staffTab.style.background = currentSchedule === "staff" ? "#4CAF50" : "#2a2a40";
+        minimumTab.style.background = currentSchedule === "minimum" ? "#4CAF50" : "#2a2a40";
+      }
+
+      function renderSchedule() {
+        scheduleDiv.innerHTML = "";
+        schedules[currentSchedule].forEach(item => {
+          const itemDiv = document.createElement("div");
+          itemDiv.className = "schedule-item";
+          itemDiv.innerHTML = `<span style="font-weight: bold;">${item.period}</span><span class="time-text">${item.time}</span>`;
+          scheduleDiv.appendChild(itemDiv);
+        });
+      }
+
+      renderSchedule();
+    }
+
+    function showFocusMusic() {
+      showBackButton();
+      document.getElementById("title").innerText = "🎵 Focus Music";
+      const content = document.getElementById("mainContent");
+      content.innerHTML = "";
+
+      const playlists = [
+        { name: "Peaceful Piano", url: "https://www.youtube.com/embed/lTRiuFIWV54" },
+        { name: "Lofi Study Music", url: "https://www.youtube.com/embed/n61ULEU7CO0" },
+        { name: "Chill Music", url: "https://www.youtube.com/embed/wAPCSnAhhC8" }
+      ];
+
+      let currentIndex = 0;
+
+      const iframe = document.createElement("iframe");
+      iframe.src = playlists[currentIndex].url;
+      iframe.allow = "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture";
+      iframe.allowFullscreen = true;
+      content.appendChild(iframe);
+
+      const nameDiv = document.createElement("div");
+      nameDiv.style.cssText = "text-align:center;margin-bottom:15px;font-weight:bold;font-size:18px;";
+      nameDiv.innerText = playlists[currentIndex].name;
+      content.appendChild(nameDiv);
+
+      const btnContainer = document.createElement("div");
+      btnContainer.style.display = "flex";
+      btnContainer.style.gap = "12px";
+
+      btnContainer.appendChild(createButton("Previous", () => {
+        currentIndex = (currentIndex - 1 + playlists.length) % playlists.length;
+        iframe.src = playlists[currentIndex].url;
+        nameDiv.innerText = playlists[currentIndex].name;
+      }, { wide: true }));
+
+      btnContainer.appendChild(createButton("Next", () => {
+        currentIndex = (currentIndex + 1) % playlists.length;
+        iframe.src = playlists[currentIndex].url;
+        nameDiv.innerText = playlists[currentIndex].name;
+      }, { wide: true }));
+
+      content.appendChild(btnContainer);
+    }
+
+    function showStudyNotes() {
+      showBackButton();
+      document.getElementById("title").innerText = "📝 Study Notes";
+      const content = document.getElementById("mainContent");
+      content.innerHTML = "";
+
+      let notesData = {};
+      try {
+        let saved = localStorage.getItem("studyNotes");
+        if (saved) notesData = JSON.parse(saved);
+      } catch (e) {}
+
+      const textarea = document.createElement("textarea");
+      textarea.placeholder = "Write your study notes here...";
+      textarea.value = notesData.notes || "";
+      textarea.style.height = "500px";
+      content.appendChild(textarea);
+
+      const saveBtn = createButton("💾 Save Notes", () => {
+        try {
+          localStorage.setItem("studyNotes", JSON.stringify({ notes: textarea.value }));
+          const msg = document.createElement("div");
+          msg.className = "success-msg";
+          msg.innerText = "✓ Notes saved!";
+          content.appendChild(msg);
+          setTimeout(() => msg.remove(), 2000);
+        } catch (e) {
+          alert("Error saving notes");
+        }
+      }, { wide: true, bg: "#4CAF50" });
+      content.appendChild(saveBtn);
+    }
+
+    function showClassTimer() {
+      showBackButton();
+      document.getElementById("title").innerText = "⏰ Class Timer";
+      const content = document.getElementById("mainContent");
+      content.innerHTML = "";
+
+      const regularSchedule = [
+        { name: "Zero Period", start: "7:15", end: "8:00" },
+        { name: "Homeroom", start: "8:18", end: "8:23" },
+        { name: "Period 1", start: "8:23", end: "9:12" },
+        { name: "Period 2", start: "9:17", end: "10:06" },
+        { name: "Period 3", start: "10:11", end: "11:00" },
+        { name: "Period 4", start: "11:05", end: "11:54" },
+        { name: "Lunch", start: "11:54", end: "12:32" },
+        { name: "SSR", start: "12:37", end: "12:52" },
+        { name: "Period 5", start: "12:52", end: "13:41" },
+        { name: "Period 6", start: "13:46", end: "14:35" }
+      ];
+
+      let currentSchedule = regularSchedule;
+      let scheduleType = "Regular";
+      let timerInterval = null;
+
+      const periodDisplay = document.createElement("div");
+      periodDisplay.className = "period-display";
+      content.appendChild(periodDisplay);
+
+      const display = document.createElement("div");
+      display.className = "display-large";
+      display.innerText = "--:--";
+      content.appendChild(display);
+
+      const tabContainer = document.createElement("div");
+      tabContainer.className = "tab-container";
+
+      const regularBtn = createButton("Regular", () => {
+        currentSchedule = regularSchedule;
+        scheduleType = "Regular";
+        updateTimer();
+        regularBtn.style.background = "#4CAF50";
+        staffBtn.style.background = "#2a2a40";
+        minimumBtn.style.background = "#2a2a40";
+      });
+      regularBtn.style.background = "#4CAF50";
+
+      const staffBtn = createButton("Staff Day", () => {
+        currentSchedule = [
+          { name: "Zero Period", start: "7:15", end: "8:00" },
+          { name: "Homeroom", start: "8:18", end: "8:22" },
+          { name: "Period 1", start: "8:22", end: "8:56" },
+          { name: "Period 2", start: "9:01", end: "9:35" },
+          { name: "Period 3", start: "9:40", end: "10:14" },
+          { name: "Period 4", start: "10:19", end: "10:53" },
+          { name: "Nutrition", start: "10:53", end: "11:12" },
+          { name: "Period 5", start: "11:17", end: "11:51" },
+          { name: "Period 6", start: "11:56", end: "12:30" }
+        ];
+        scheduleType = "Staff Day";
+        updateTimer();
+        regularBtn.style.background = "#2a2a40";
+        staffBtn.style.background = "#4CAF50";
+        minimumBtn.style.background = "#2a2a40";
+      });
+
+      const minimumBtn = createButton("Minimum", () => {
+        currentSchedule = [
+          { name: "Homeroom & Period 1", start: "8:18", end: "8:49" },
+          { name: "Period 2", start: "8:54", end: "9:20" },
+          { name: "Period 3", start: "9:25", end: "9:51" },
+          { name: "Period 4", start: "9:56", end: "10:22" },
+          { name: "Nutrition", start: "10:22", end: "10:47" },
+          { name: "Period 5", start: "10:53", end: "11:19" },
+          { name: "Period 6", start: "11:24", end: "11:50" }
+        ];
+        scheduleType = "Minimum";
+        updateTimer();
+        regularBtn.style.background = "#2a2a40";
+        staffBtn.style.background = "#2a2a40";
+        minimumBtn.style.background = "#4CAF50";
+      });
+
+      tabContainer.appendChild(regularBtn);
+      tabContainer.appendChild(staffBtn);
+      tabContainer.appendChild(minimumBtn);
+      content.appendChild(tabContainer);
+
+      function timeToMinutes(timeStr) {
+        const parts = timeStr.split(":");
+        return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+      }
+
+      function getCurrentPeriod() {
+        const now = new Date();
+        const currentMinutes = now.getHours() * 60 + now.getMinutes();
+        for (let i = 0; i < currentSchedule.length; i++) {
+          const period = currentSchedule[i];
+          const startMin = timeToMinutes(period.start);
+          const endMin = timeToMinutes(period.end);
+          if (currentMinutes >= startMin && currentMinutes < endMin) {
+            return { period: period, secondsLeft: (endMin - currentMinutes) * 60 - now.getSeconds() };
+          }
+        }
+        return null;
+      }
+
+      function updateTimer() {
+        const current = getCurrentPeriod();
+        if (current) {
+          periodDisplay.innerText = "📚 " + current.period.name + " (" + scheduleType + ")";
+          const mins = Math.floor(current.secondsLeft / 60);
+          const secs = current.secondsLeft % 60;
+          display.innerText = mins + ":" + (secs < 10 ? "0" : "") + secs;
+          if (current.secondsLeft <= 60) {
+            display.style.color = "#ff6b6b";
+          } else if (current.secondsLeft <= 300) {
+            display.style.color = "#FFD700";
+          } else {
+            display.style.color = "white";
+          }
+        } else {
+          periodDisplay.innerText = "No class in session";
+          display.innerText = "--:--";
+          display.style.color = "#b0b0b0";
+        }
+      }
+
+      updateTimer();
+      timerInterval = setInterval(updateTimer, 1000);
+    }
+
+    function showResources() {
+      showBackButton();
+      document.getElementById("title").innerText = "🔗 Quick Links";
+      const content = document.getElementById("mainContent");
+      content.innerHTML = "";
+
+      const resources = [
+        { name: "Clever Portal", url: "https://clever.com/in/lvusd/student/portal", icon: "🤓" },
+        { name: "Amplify", url: "https://learning.amplify.com/home/student/", icon: "🧮" },
+        { name: "SmartPass", url: "https://app.smartpass.app/main/passes", icon: "🚽" },
+        { name: "Aeries", url: "https://student.lvusd.org/", icon: "🎓" },
+        { name: "TCI", url: "https://subscriptions.teachtci.com/student/classes", icon: "🔭" },
+        { name: "Renaissance", url: "https://global-zone50.renaissance-go.com/studentportal/", icon: "📖" }
+      ];
+
+      const container = document.createElement("div");
+      container.className = "resource-links";
+
+      resources.forEach(resource => {
+        const btn = createButton(resource.icon + " " + resource.name, () => {
+          window.open(resource.url, "_blank");
+        }, { wide: true, bg: "#2196F3" });
+        container.appendChild(btn);
+      });
+
+      content.appendChild(container);
+    }
+
+    function showEventPanel(day, month, year) {
+      showBackButton();
+      document.getElementById("title").innerText = "📌 Events for " + (month + 1) + "/" + day + "/" + year;
+      const content = document.getElementById("mainContent");
+      content.innerHTML = "";
+
+      const dateKey = year + "-" + (month + 1) + "-" + day;
+      let eventData = calendarEvents[dateKey] || { events: [] };
+
+      const eventsList = document.createElement("div");
+      eventsList.className = "events-list";
+
+      if (eventData.events.length === 0) {
+        eventsList.innerHTML = '<div class="no-events">No events yet</div>';
+      } else {
+        eventData.events.forEach((evt, idx) => {
+          const eventItem = document.createElement("div");
+          eventItem.className = "event-item";
+          eventItem.innerHTML = `<span>${evt}</span>`;
+          
+          const deleteBtn = createButton("✕", () => {
+            eventData.events.splice(idx, 1);
+            saveEvents();
+            showEventPanel(day, month, year);
+          });
+          deleteBtn.style.margin = "0";
+          deleteBtn.style.padding = "4px 12px";
+          deleteBtn.style.background = "#ff6b6b";
+          eventItem.appendChild(deleteBtn);
+          eventsList.appendChild(eventItem);
+        });
+      }
+      content.appendChild(eventsList);
+
+      const textarea = document.createElement("textarea");
+      textarea.placeholder = "Add event or due date...";
+      textarea.style.height = "150px";
+      content.appendChild(textarea);
+
+      const addBtn = createButton("Add Event", () => {
+        if (textarea.value.trim()) {
+          eventData.events.push(textarea.value.trim());
+          saveEvents();
+          textarea.value = "";
+          showEventPanel(day, month, year);
+        }
+      }, { wide: true, bg: "#4CAF50" });
+      content.appendChild(addBtn);
+
+      function saveEvents() {
+        if (eventData.events.length === 0) {
+          delete calendarEvents[dateKey];
+        } else {
+          calendarEvents[dateKey] = eventData;
+        }
+        try {
+          localStorage.setItem("calendarEvents", JSON.stringify(calendarEvents));
+        } catch (e) {
+          alert("Error saving events");
+        }
+      }
+    }
+
+    function showCalendarPanel() {
+      showBackButton();
+      document.getElementById("title").innerText = "📅 Calendar";
+      const content = document.getElementById("mainContent");
+      content.innerHTML = "";
+
+      let now = new Date();
+      let month = now.getMonth();
+      let year = now.getFullYear();
+
+      function renderCalendar() {
+        content.innerHTML = "";
+
+        const navContainer = document.createElement("div");
+        navContainer.style.cssText = "display:flex;gap:12px;margin-bottom:20px;align-items:center;justify-content:center;";
+
+        const prevBtn = createButton("<", () => {
+          month--;
+          if (month < 0) { month = 11; year--; }
+          renderCalendar();
+        });
+
+        const monthDisplay = document.createElement("span");
+        const monthName = new Date(year, month).toLocaleString('default', { month: 'long' });
+        monthDisplay.innerText = monthName + " " + year;
+        monthDisplay.style.cssText = "font-size:20px;font-weight:bold;min-width:150px;text-align:center;";
+
+        const nextBtn = createButton(">", () => {
+          month++;
+          if (month > 11) { month = 0; year++; }
+          renderCalendar();
+        });
+
+        navContainer.appendChild(prevBtn);
+        navContainer.appendChild(monthDisplay);
+        navContainer.appendChild(nextBtn);
+        content.appendChild(navContainer);
+
+        const cal = document.createElement("div");
+        cal.className = "calendar-grid";
+
+        ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].forEach(d => {
+          const header = document.createElement("div");
+          header.style.cssText = "font-weight:bold;text-align:center;padding:10px;";
+          header.innerText = d;
+          cal.appendChild(header);
+        });
+
+        const firstDay = new Date(year, month, 1).getDay();
+        const lastDate = new Date(year, month + 1, 0).getDate();
+
+        for (let i = 0; i < firstDay; i++) {
+          cal.appendChild(document.createElement("div"));
+        }
+
+        for (let i = 1; i <= lastDate; i++) {
+          const cellWrapper = document.createElement("div");
+          cellWrapper.style.position = "relative";
+
+          const cell = document.createElement("div");
+          cell.className = "calendar-cell";
+          cell.innerText = i;
+
+          const dateKey = year + "-" + (month + 1) + "-" + i;
+          if (calendarEvents[dateKey] && calendarEvents[dateKey].events.length > 0) {
+            const dot = document.createElement("div");
+            dot.className = "event-dot";
+            cellWrapper.appendChild(dot);
+          }
+
+          if (i === now.getDate() && month === now.getMonth() && year === now.getFullYear()) {
+            cell.classList.add("today");
+          }
+
+          cell.onclick = () => showEventPanel(i, month, year);
+          cellWrapper.appendChild(cell);
+          cal.appendChild(cellWrapper);
+        }
+
+        content.appendChild(cal);
+      }
+
+      renderCalendar();
+    }
+
+    buildMainPanel();
+  </script>
+</body>
+</html>
+
